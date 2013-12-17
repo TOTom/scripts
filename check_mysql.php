@@ -1,56 +1,40 @@
 <?php
+/*class runtime
+{
+    var $StartTime = 0;
+    var $StopTime = 0;
+    function get_microtime()
+    {
+        list($usec, $sec) = explode(' ', microtime());
+        return ((float)$usec + (float)$sec);
+    }
+    function start()
+    {
+        $this->StartTime = $this->get_microtime();
+    }
+    function stop()
+    {
+        $this->StopTime = $this->get_microtime();
+    }
+    function spent()
+    {
+        return round(($this->StopTime - $this->StartTime) * 1000, 1);
+    }
+}*/
 
-function help() {
-        echo "example: \n\tcheck_mysql.php -h127.0.0.1 -P3306 -uuser -ppassword \n";
-        echo "\n\t-h host        :hostname";
-        echo "\n\t-P port        :port";
-        echo "\n\t-u user        :user";
-        echo "\n\t-p password    :password";
-        echo "\n\t--help";
+function get_microtime()
+{
+        list($usec, $sec) = explode(' ', microtime());
+        return ((float)$usec + (float)$sec);
 }
 
-$longopts = array("help");
-$showslave = 'show slave status';
-if ($options = getopt('h:P:u:p:',$longopts)) {
-        if (empty($options['h']) || empty($options['P']) || empty($options['u']) || empty($options['p'])) {
-                help();
-                exit(0);
-        }else{
-                foreach ($options as $key => $value){
-                        if ($key === "help"){
-                                help();
-                                exit(0);
-                        }else {
-                                $host = $options['h'];
-                                $port = $options['P'];
-                                $user = $options['u'];
-                                $password = $options['p'];
-                        }
-                }
-        }
-}else {
-        help();
-        exit(1);
-}
-
-$link = new mysqli($host, $user, $password, $port);
-if ($link->connect_errno) {
-        fwrite($file, "$timestamp $link->connect_errno $link->connect_error\n");
-        exit(2);
-}
-if ($result = $link->query($showslave)){
-        while ($row = $result->fetch_assoc()){
-                var_dump($row);
-                $result->close();
-        }
-}
-var_dump($options);
-
-/*
+$sql = 'SELECT SQL_NO_CACHE `sina_id`, `focus`, `s_cate_id` as cate_id, `s_cate_name`, `title` as book_name, `ISBN`, `ISBN13`, `publisher`, `publish_date`, `src`, `s_bid`, `intro`, `check_status`, `pub_price`, `status` FROM (`read_books`) WHERE `sina_id` = 27871 LIMIT 1';
+$log = "./check_mysql.log";
+$file = fopen($log, "a");
 while (1){
         $timestamp = date("Y-m-d H:i:s");
         $StartTime = get_microtime();
-        $link = new mysqli('172.16.10.11', 'pu_r', '57D89m8DsdfeeeeVH5Z', 'user', 10185);
+        $link = new mysqli('172.16.6.214', 'publish_r', '57D89m8DVH5Z', 'publish', 10185);
         if ($link->connect_errno) {
                 fwrite($file, "$timestamp $link->connect_errno $link->connect_error\n");
 
@@ -71,5 +55,4 @@ while (1){
         sleep(1);
 }
 fclose($file);
-*/
 ?>
