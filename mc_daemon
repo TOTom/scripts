@@ -1,0 +1,138 @@
+#!/bin/bash
+
+##
+memcached="/usr/local/sina_mobile/memcached/bin/memcached"
+#the default values
+ipaddr=$(/sbin/ifconfig eth1|grep "inet addr"|awk '{print $2}'|cut -d: -f2)
+if [ -z $ipaddr ];then
+        ipaddr=$(/sbin/ifconfig eth0|grep "inet addr"|awk '{print $2}'|cut -d: -f2)
+fi
+connect=4096
+minimumspace=48
+threads=4
+user="nobody"
+daemon_name=$0
+mail_addr="lele1@book.sina.com"
+count=1
+
+help() {
+
+    echo "example: $daemon_name -u root -l 172.16.193.27 -p 11111 -t 4 -m 1024 -c 4096"
+    echo "-p <num>      TCP port number to listen on (default: 11211)"
+    echo "-l <addr>     interface to listen on (default: INADDR_ANY, all addresses)
+              <addr> may be specified as host:port. If you don't specify
+              a port number, the value you specified with -p or -U is
+              used. You may specify multiple addresses separated by comma
+              or by using -l multiple times"
+    echo "-u <username> assume identity of <username> (only when run as root)"
+    echo "-m <num>      max memory to use for items in megabytes (default: 1024 MB)"
+    echo "-c <num>      max simultaneous connections (default: 4096)"
+    echo "-t <num>      number of threads to use (default: 4)"
+    echo "-n <bytes>    minimum space allocated for key+value+flags (default: 48)"
+}
+
+integer() {
+    expr $1 + 0 1>/dev/null 2>&1 
+    if [ $? -ne 0 ];then
+        echo "$daemon_name illegal argument, $2 parameter must by integer"
+        return 2
+    fi
+}
+
+start() {
+    $memcached $options
+}
+
+alive() {
+    mc_pid=$(ps -eo pid,ppid,cmd|grep "memcached"|grep -v $daemon_name|grep "$2"|grep -v "grep"|awk '{print $1}')
+    if [ -n "$mc_pid" ];then
+        mc_alive=1
+        return 1
+    else
+        return 0
+    fi
+#    result=$(printf "set test 0 0 4\r\ntest\r\n"|nc -w 5 $1 $2)
+#    if [ "$result" != "STORED" ];then
+#        echo "memcached $1 $2 suspend"
+#        return 1
+#    fi
+}
+
+
+while getopts :u:c:m:t:p:l:n:h value 
+do
+    
+    case $value in 
+        c)
+            connect=$OPTARG
+            integer $connect -c
+            if [ $? -eq 2 ];then
+                help
+                exit 2
+            fi
+            ;;
+        m)
+            memory=$OPTARG
+            integer $memory -m
+            if [ $? -eq 2 ];then
+                help
+                exit 2
+            fi
+            ;;
+        t)
+            threads=$OPTARG
+            integer $threads -t
+            if [ $? -eq 2 ];then
+                help
+                exit 2
+            fi
+            ;;
+        u)
+            user=$OPTARG
+            ;;
+        p)
+            port=$OPTARG
+            ;;
+        l)
+            ipaddr=$OPTARG
+            ;;
+        n)
+            minimumspace=$OPTARG
+            ;;
+        h)
+            help
+            exit 0
+            ;;
+        :)
+            echo "option requires an argument -$OPTARG"
+            help
+            exit 0
+            ;;
+        ?)
+            echo "Illegal argument:$OPTARG"
+            help
+            exit 0
+            ;;
+    esac
+done
+
+if [ -z "$port" -o -z "$memory" ];then
+    echo "you must define port and memory size"
+    help
+    exit
+fi
+options="-d -u $user -l $ipaddr -p $port -t $threads -m $memory -c $connect -n $minimumspace"
+
+while [ 1 ];do 
+    alive $ipaddr $port
+    if [ $? -ne 1 ];then
+        start
+        if [ $count -eq 1 ];then
+            count=` expr $count + 1 `
+        else
+            start_time=$(date)
+            echo "$start_time memcached $ipaddr $port restart $count" | /bin/mail -s"$ipaddr $port restart" $mail_addr
+        fi
+    fi
+    sleep 30
+done
