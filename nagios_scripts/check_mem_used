@@ -1,0 +1,118 @@
+#!/bin/bash
+#########################################################################
+#
+# File:         check_meminfo
+# Description:  Check the memory command .
+# Language:     GNU Bourne-Again SHell
+# Version:      1.0.0
+# Date:         2012-08-20
+# Author:       lele1@staff.sina.com.cn 
+############################
+#
+# Exit values:
+# ------------
+#    0          OK
+#    1          Warning
+#    2          Critical
+#    3          Unknow
+#    4		Unknow
+#    Others     Unknown
+#
+# ----------------------------------------------------------------------
+# These are Parameters from external
+# -w 	warning threshold value,must be percentage
+#	Exit with WARNING status when memory used more than warning value
+# -c 	critical threshold value,must be percentage
+#       Exit with CRITICAL status when memory used more than critical value
+# -s    the threshold value of the swap used,must be percentage
+#       Exit with CRITICAL status when swap used more than threshold value
+# -h    help info
+
+
+
+meminfo="/proc/meminfo"
+
+#help function
+print_help_msg(){
+    echo " check the memory used"
+    echo " -w    warning threshold value,must be percentage"
+    echo "       Exit with WARNING status when memory used more than warning value"
+    echo " -c    critical threshold value,must be percentage"
+    echo "       Exit with CRITICAL status when memory used more than critical value"
+    echo " -s    the threshold value of the swap used,must be percentage"
+    echo "       Exit with CRITICAL status when swap used more than threshold value"
+    echo " -h    help info"
+}
+
+if [ $# -lt 1 ]; then
+        print_help_msg
+        exit 3
+else
+        while getopts hw:c:s: OPTION
+    do
+        case $OPTION
+        in
+                w)
+                        warning=$OPTARG
+                        ;;
+                c)
+                        critical=$OPTARG
+                        ;;
+                s)
+                        swap_threshold=$OPTARG
+                        ;;
+                h)
+                        print_help_msg
+                        exit 3
+                        ;;
+                ?)
+                        echo "Error: Illegal Option."
+                        print_help_msg
+                        exit 3
+                        ;;
+        esac
+        done
+fi
+
+eval $(awk '{
+    if($1 ~ /^MemTotal/) {
+        MemTotal=$2;
+    }
+    else if($1 ~ /^MemFree/){
+        MemFree=$2;
+    }
+    else if($1 ~ /^Buffers/){
+        Buffers=$2;
+    }
+    else if($1 ~ /^Cached/){
+        Cached=$2;
+    }
+    else if($1 ~ /^SwapTotal/){
+        SwapTotal=$2;
+    }
+    else if($1 ~ /^SwapFree/){
+        SwapFree=$2;
+    }
+    }END{ print "MemTotal="MemTotal";MemFree="MemFree";Buffers="Buffers";Cached="Cached";SwapTotal="SwapTotal";SwapFree="SwapFree;}' $meminfo)
+
+
+MemAvailable=` expr $MemFree + $Buffers + $Cached `
+swap_used_percent=$(echo "scale=2;(1-$SwapFree/$SwapTotal)*100"|bc)
+swap_used_percent=${swap_used_percent%%.*}
+mem_used_percent=$(echo "scale=2;(1-$MemAvailable/$MemTotal)*100"|bc)
+mem_used_percent=${mem_used_percent%%.*}
+
+
+
+
+if [ $swap_used_percent -gt $swap_threshold ];then
+	echo "Critical swap used %${swap_used_percent}" && exit 2
+elif [ $mem_used_percent -ge $critical ];then
+	echo "Critical memory used %${mem_used_percent}" && exit 2
+elif [ $mem_used_percent -ge $warning ];then
+        echo "Warning memory used %${mem_used_percent}" && exit 1
+else
+	echo "Check memory used OK" && exit 0
+fi
+
+
